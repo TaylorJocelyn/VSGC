@@ -1,0 +1,101 @@
+model:
+  base_learning_rate: 0.0001
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0195
+    num_timesteps_cond: 1
+    log_every_t: 200
+    timesteps: 1000
+    first_stage_key: image
+    cond_stage_key: class_label
+    image_size: 64
+    channels: 3
+    cond_stage_trainable: true
+    conditioning_key: crossattn
+    monitor: val/loss
+    use_ema: False
+    
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size: 64
+        in_channels: 3
+        out_channels: 3
+        model_channels: 192
+        attention_resolutions:
+        - 8
+        - 4
+        - 2
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 2
+        - 3
+        - 5
+        num_heads: 1
+        use_spatial_transformer: true
+        transformer_depth: 1
+        context_dim: 512
+    
+    first_stage_config:
+      target: ldm.models.autoencoder.VQModelInterface
+      params:
+        embed_dim: 3
+        n_embed: 8192
+        ddconfig:
+          double_z: false
+          z_channels: 3
+          resolution: 256
+          in_channels: 3
+          out_ch: 3
+          ch: 128
+          ch_mult:
+          - 1
+          - 2
+          - 4
+          num_res_blocks: 2
+          attn_resolutions: []
+          dropout: 0.0
+        lossconfig:
+          target: torch.nn.Identity
+    
+    cond_stage_config:
+      target: ldm.modules.encoders.modules.ClassEmbedder
+      params:
+        n_classes: 1001
+        embed_dim: 512
+        key: class_label
+
+ckpt:
+  path: /home/zq/VSGC/models/ldm/cin256-v2/model.ckpt
+
+quant:
+    a_qconfig:
+        quantizer: LSQFakeQuantize
+        observer: MSEObserver
+        bit: 8
+        symmetric: False
+        ch_axis: -1
+    w_qconfig:
+        quantizer: AdaRoundFakeQuantize
+        observer: MSEObserver
+        bit: 4
+        symmetric: False
+        ch_axis: 0
+    calibrate: 
+      data_path: /home/zq/PTQD/reproduce/scale3.0_eta0.0_step20/imagenet/w4a8/imagenet_input_1000classes.pth
+      num: 1024
+    recon:
+        batch_size: 8
+        scale_lr: 4.0e-5
+        warm_up: 0.2
+        weight: 0.01
+        iters: 20000
+        b_range: [20, 2]
+        keep_gpu: True
+        round_mode: learned_hard_sigmoid
+        drop_prob: 0.5
+
+process:
+    seed: 1005
